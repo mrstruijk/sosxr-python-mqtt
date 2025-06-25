@@ -6,29 +6,30 @@ try:
     import usocket as socket
 except:
     import socket
+
+import machine
+import ubinascii
 import ustruct as struct
-from ubinascii import hexlify
+
 
 class MQTTException(Exception):
     pass
 
+
 class MQTTClient:
 
-    def __init__(self, client_id, server, port=0, user=None, password=None, keepalive=0,
-                 ssl=False, ssl_params={}):
-        if port == 0:
-            port = 8883 if ssl else 1883
-        self.client_id = client_id
+    def __init__(self, client_id=None, server=None, broker_port=None, user=None, password=None, keepalive=None, ssl=None, ssl_params=None):
+        self.client_id = client_id or ubinascii.hexlify(machine.unique_id())
+        self.server = server or '192.192.192.192'  # Default server IP
+        self.ssl = ssl or False
+        self.port = broker_port or (8883 if self.ssl else 1883)
+        self.keepalive = keepalive or 0
+        self.ssl_params = ssl_params or {}
         self.sock = None
-        self.server = server
-        self.port = port
-        self.ssl = ssl
-        self.ssl_params = ssl_params
         self.pid = 0
         self.cb = None
-        self.user = user
-        self.pswd = password
-        self.keepalive = keepalive
+        self.user = user  # Can be None
+        self.pswd = password  # Can be None
         self.lw_topic = None
         self.lw_msg = None
         self.lw_qos = 0
@@ -92,7 +93,7 @@ class MQTTClient:
 
         self.sock.write(premsg, i + 2)
         self.sock.write(msg)
-        #print(hex(len(msg)), hexlify(msg, ":"))
+        # print(hex(len(msg)), hexlify(msg, ":"))
         self._send_str(self.client_id)
         if self.lw_topic:
             self._send_str(self.lw_topic)
@@ -126,7 +127,7 @@ class MQTTClient:
             sz >>= 7
             i += 1
         pkt[i] = sz
-        #print(hex(len(pkt)), hexlify(pkt, ":"))
+        # print(hex(len(pkt)), hexlify(pkt, ":"))
         self.sock.write(pkt, i + 1)
         self._send_str(topic)
         if qos > 0:
@@ -153,7 +154,7 @@ class MQTTClient:
         pkt = bytearray(b"\x82\0\0\0")
         self.pid += 1
         struct.pack_into("!BH", pkt, 1, 2 + 2 + len(topic) + 1, self.pid)
-        #print(hex(len(pkt)), hexlify(pkt, ":"))
+        # print(hex(len(pkt)), hexlify(pkt, ":"))
         self.sock.write(pkt)
         self._send_str(topic)
         self.sock.write(qos.to_bytes(1, "little"))
@@ -161,7 +162,7 @@ class MQTTClient:
             op = self.wait_msg()
             if op == 0x90:
                 resp = self.sock.read(4)
-                #print(resp)
+                # print(resp)
                 assert resp[1] == pkt[2] and resp[2] == pkt[3]
                 if resp[3] == 0x80:
                     raise MQTTException(resp[3])
