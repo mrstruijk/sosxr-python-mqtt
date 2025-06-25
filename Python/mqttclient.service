@@ -1,0 +1,13 @@
+[Unit]
+Description=Doorbell awesomeness
+After=network.target
+
+[Service]
+Restart=always
+RestartSec=120
+User=mrstruijk
+WorkingDirectory=/home/
+ExecStart=/usr/bin/python3 /usr/sbin/mqttclient.py
+
+[Install]
+WantedBy=multi-user.target
