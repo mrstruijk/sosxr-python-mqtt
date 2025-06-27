@@ -50,5 +50,5 @@ class WiFiConnect:
 
 
 if __name__ == "__main__":
-    wifi_connector = WiFiConnect('192.168.178.999', 'password123')
+    wifi_connector = WiFiConnect('SSID_Name', 'password123')
     wifi_connector.connect_to_wifi()
