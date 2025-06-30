@@ -1,32 +1,43 @@
-# mqttclient.py
-
 import paho.mqtt.client as mqtt
-from gpiozero import Device, LED
-from gpiozero.pins.pigpio import PiGPIOFactory
-
-broker_ip = "192.192.192.192"  # What IP address is this broker running on?
-
-Device.pin_factory = PiGPIOFactory()
-
-led_pin = 21
-led = LED(led_pin)
 
 
-def on_connect(client, userdata, flags, rc):
-    print("Connected with result code " + str(rc))
-    client.subscribe("doorbell")
+class MQTTClient:
+    def __init__(self, broker="localhost", port=1883, topic="#"):
+        self._subscribers = []
+        self.topic = topic
 
+        self.client = mqtt.Client()
+        self.client.on_connect = self._on_connect
+        self.client.on_message = self._on_message
+        self.client.connect(broker, port, 60)
+        self.client.loop_start()
 
-def on_message(client, userdata, msg):
-    print("Topic: " + msg.topic + " & " + "Payload: " + msg.payload.decode())
-    led.toggle()
+    def _on_connect(self, client, userdata, flags, rc):
+        if rc == 0:
+            print("MQTT Connected")
+            self.subscribe(self.topic)
+        else:
+            print(f"MQTT Connect failed: {rc}")
 
+    def subscribe(self, topic):
+        self.client.subscribe(topic)
 
-client = mqtt.Client()
+    def unsubscribe(self, topic):
+        self.client.unsubscribe(topic)
 
-client.on_connect = on_connect
-client.on_message = on_message
+    def publish(self, topic, payload, retain=False, qos=0):
+        self.client.publish(topic, payload, retain=retain, qos=qos)
+        print(f"📤 {topic}: {payload} (retain={retain}, qos={qos})")
 
-client.connect(broker_ip, 1883)
+    def _on_message(self, client, userdata, msg):
+        payload = msg.payload.decode()
+        print(f"MQTT Client received: {msg.topic}: {payload}")
+        for callback in self._subscribers:
+            callback(msg.topic, payload)
 
-client.loop_forever()
+    def on_message(self, callback):
+        self._subscribers.append(callback)
+
+    def cleanup(self):
+        self.unsubscribe(self.topic)
+        self.client.disconnect()
